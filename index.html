@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="si"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Budget vs Requisition - May 2026</title>
+<style>
+*{box-sizing:border-box} body{margin:0;font-family:sans-serif;background:#f2f2f2;padding:10px}
+h2{text-align:center;margin:5px} .top{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:10px 0}
+button,input,select{padding:10px;border-radius:8px;border:1px solid #ccc;font-size:14px}
+button{background:#111;color:#fff;font-weight:bold;cursor:pointer} .green{background:#0a7a42} .red{background:#c00}
+.card{background:#fff;padding:12px;border-radius:12px;margin-bottom:10px;overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:750px} th,td{border:1px solid #ddd;padding:8px;text-align:right;white-space:nowrap}
+th{background:#111;color:#fff;text-align:center} td:first-child{text-align:center}
+input[type=number],input[type=date]{width:110px} .free{color:#0a7a42;font-weight:bold} .lost{color:#c00;font-weight:bold}
+.total td{font-weight:bold;background:#ffeeba} .netloss{color:#c00;font-size:18px}
+</style></head><body>
+<h2>📊 Daily Budget vs Requisition</h2>
+<div class="top">
+<input type="date" id="dDate"><input type="number" id="dBudget" placeholder="Budget">
+<input type="number" id="dReq" placeholder="Total Requisition">
+<input type="number" id="dButch" placeholder="Butchery Cost">
+<input type="number" id="dStaff" placeholder="Staff Kitchen Cost">
+<button class="green" onclick="addRow()">+ Add Day</button>
+<button onclick="exportCSV()">⬇ Excel / CSV Download</button>
+<button class="red" onclick="clearAll()">Clear All</button>
+</div>
+
+<div class="card"><table><thead><tr>
+<th>Date</th><th>Budget</th><th>Total Requisition</th><th>Free</th><th>Lost</th>
+<th>Butchery Cost</th><th>Staff Kitchen Cost</th><th>❌</th>
+</tr></thead><tbody id="tbody"></tbody>
+<tfoot><tr class="total"><td>TOTAL</td><td id="tB">0</td><td id="tR">0</td><td id="tF">0</td><td id="tL">0</td><td id="tBu">0</td><td id="tSt">0</td><td></td></tr></tfoot></table></div>
+
+<div class="card" style="text-align:center">
+<h3>TOTAL LOSS BUDGERT : <span id="net" class="netloss">0</span></h3>
+<p>Formula: Total Free - Total Lost</p>
+</div>
+
+<div class="card"><h3>Cost Per Person</h3><table style="min-width:400px"><tr><th>Meal</th><th>Cost Per Person</th><th>Person's Count</th><th>Total Cost</th></tr>
+<tr><td>B/F</td><td><input type="number" id="bf" value="800" onchange="calcCPP()"></td><td rowspan="3"><input type="number" id="pCount" value="0" onchange="calcCPP()"></td><td id="bfTot">0</td></tr>
+<tr><td>Lunch</td><td><input type="number" id="lunch" value="1200" onchange="calcCPP()"></td><td id="lunchTot">0</td></tr>
+<tr><td>Dinner</td><td><input type="number" id="dinner" value="1500" onchange="calcCPP()"></td><td id="dinnerTot">0</td></tr>
+<tr class="total"><td>Total</td><td id="cppTot">3500</td><td id="pCountShow">0</td><td id="grandTot">0</td></tr>
+</table></div>
+
+<script>
+let KEY="budget_may2026_v1";
+let data = JSON.parse(localStorage.getItem(KEY)) || [
+["2026-05-01",36100,43395.5,8700,18194.92],["2026-05-02",98600,83007.36,47523.52,27410],
+["2026-05-03",89700,87008.58,26065,23094.83],["2026-05-04",40700,51648.23,17133.01,38579.96],
+["2026-05-05",83900,129975.67,65333.02,37539.15],["2026-05-06",92200,124461.41,16300,27891.7],
+["2026-05-07",165600,261660.01,99947.04,21284],["2026-05-08",120500,84768,35885.83,22738],
+["2026-05-09",43100,90940.69,24740,20284.97],["2026-05-10",87400,89497.21,21500.51,25243.36],
+["2026-05-11",51500,56073.72,27150.51,42030.3],["2026-05-12",91300,92503.45,42824.5,19966.96],
+["2026-05-13",29900,27498.92,8950,21892.47],["2026-05-14",167900,157634.02,53301.2,45570.94],
+["2026-05-15",135700,160577.45,110537,40946],["2026-05-16",119600,85602.18,35200,25426],
+["2026-05-17",75900,110855.88,26900,27975.26],["2026-05-18",52900,68475.01,0,24842.77],
+["2026-05-19",6900,3107,0,16708.1],["2026-05-20",72900,64318.3,8300,41828.27],
+["2026-05-21",72900,79520.41,34632.5,37015.77],["2026-05-22",54500,60657.27,5352.5,29861.44],
+["2026-05-23",73000,64222.47,16205,29861.44],["2026-05-24",65500,96543.08,32495,39148.77],
+["2026-05-25",65300,62492.87,31295,44975.69],["2026-05-26",21700,4980,4980,21212],
+["2026-05-27",23500,13578,2554,23083.27],["2026-05-28",0,46835,0,38554.92],
+["2026-05-29",142600,99824.46,44045,0],["2026-05-30",47300,96676.44,23000,15311.1],
+["2026-05-31",112700,107516.14,24492.5,16250.69]
+];
+function fmt(n){return Number(n||0).toLocaleString('en-LK',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function render(){
+  let tb=document.getElementById('tbody'); tb.innerHTML="";
+  let tB=0,tR=0,tF=0,tL=0,tBu=0,tSt=0;
+  data.sort((a,b)=>a[0].localeCompare(b[0])).forEach((r,i)=>{
+    let free=Math.max(r[1]-r[2],0), lost=Math.max(r[2]-r[1],0);
+    tB+=r[1]; tR+=r[2]; tF+=free; tL+=lost; tBu+=r[3]||0; tSt+=r[4]||0;
+    tb.innerHTML+=`<tr><td><input type="date" value="${r[0]}" onchange="edit(${i},0,this.value)"></td>
+    <td><input type="number" value="${r[1]}" onchange="edit(${i},1,this.value)"></td>
+    <td><input type="number" value="${r[2]}" onchange="edit(${i},2,this.value)"></td>
+    <td class="free">${fmt(free)}</td><td class="lost">${fmt(lost)}</td>
+    <td><input type="number" value="${r[3]||''}" onchange="edit(${i},3,this.value)"></td>
+    <td><input type="number" value="${r[4]||''}" onchange="edit(${i},4,this.value)"></td>
+    <td><button onclick="del(${i})">❌</button></td></tr>`;
+  });
+  document.getElementById('tB').innerText=fmt(tB);
+  document.getElementById('tR').innerText=fmt(tR);
+  document.getElementById('tF').innerText=fmt(tF);
+  document.getElementById('tL').innerText=fmt(tL);
+  document.getElementById('tBu').innerText=fmt(tBu);
+  document.getElementById('tSt').innerText=fmt(tSt);
+  document.getElementById('net').innerText=fmt(tF-tL);
+  localStorage.setItem(KEY,JSON.stringify(data)); calcCPP();
+}
+function edit(i,col,val){ data[i][col]= col==0?val:Number(val||0); render(); }
+function addRow(){
+  let d=document.getElementById('dDate').value;
+  if(!d){alert("Date එක දාන්න");return}
+  data.push([d,Number(document.getElementById('dBudget').value||0),Number(document.getElementById('dReq').value||0),Number(document.getElementById('dButch').value||0),Number(document.getElementById('dStaff').value||0)]);
+  render(); document.getElementById('dBudget').value="";document.getElementById('dReq').value="";document.getElementById('dButch').value="";document.getElementById('dStaff').value="";
+}
+function del(i){ if(confirm("මේ දවස Delete කරන්නද?")){ data.splice(i,1); render(); } }
+function clearAll(){ if(confirm("සේරම Data Delete කරන්නද?")){ data=[]; render(); } }
+function calcCPP(){
+  let bf=+document.getElementById('bf').value||0, lu=+document.getElementById('lunch').value||0, di=+document.getElementById('dinner').value||0, pc=+document.getElementById('pCount').value||0;
+  let tot=bf+lu+di;
+  document.getElementById('cppTot').innerText=fmt(tot);
+  document.getElementById('bfTot').innerText=fmt(bf*pc);
+  document.getElementById('lunchTot').innerText=fmt(lu*pc);
+  document.getElementById('dinnerTot').innerText=fmt(di*pc);
+  document.getElementById('pCountShow').innerText=pc;
+  document.getElementById('grandTot').innerText=fmt(tot*pc);
+}
+function exportCSV(){
+  let csv="Date,Budget,Total Requisition,Free,Lost,Butchery Cost,Staff Kitchen Cost\n";
+  data.forEach(r=>{ let free=Math.max(r[1]-r[2],0), lost=Math.max(r[2]-r[1],0); csv+=`${r[0]},${r[1]},${r[2]},${free},${lost},${r[3]||0},${r[4]||0}\n`; });
+  let a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='Budget_May2026.csv'; a.click();
+}
+document.getElementById('dDate').valueAsDate=new Date();
+render();
+</script></body></html>
